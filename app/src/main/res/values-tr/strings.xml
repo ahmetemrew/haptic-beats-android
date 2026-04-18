@@ -1,0 +1,103 @@
+<resources>
+    <string name="app_name">HapticBeats</string>
+
+    <string name="library_title">Kütüphane</string>
+    <string name="library_subtitle">Bir kez tara, anında hisset.</string>
+    <string name="library_summary">%1$d parça • %2$d hazır</string>
+    <string name="library_ready_hint">Bir parçaya dokun. Haptik otomatik olarak kilitlenir.</string>
+    <string name="sync_library">Kütüphaneyi tara</string>
+    <string name="syncing">Taranıyor…</string>
+    <string name="open_settings">Ayarları aç</string>
+    <string name="back">Geri</string>
+
+    <string name="no_tracks_title">Henüz müzik bulunmadı</string>
+    <string name="no_tracks_body">Dokunsal oynatımı hazırlamak için ses erişimini ver ve cihaz kütüphaneni tara.</string>
+    <string name="browse_library">Kütüphaneye git</string>
+
+    <string name="now_playing">Şimdi Çalıyor</string>
+    <string name="player_subtitle">Bass ve ritme odaklanan daha güçlü bir haptik motor.</string>
+    <string name="select_song">Kütüphaneden bir parça seç</string>
+    <string name="unknown_title">Bilinmeyen Başlık</string>
+    <string name="unknown_artist">Bilinmeyen Sanatçı</string>
+    <string name="toggle_sound">Sesi aç veya kapat</string>
+    <string name="toggle_haptics">Haptiği aç veya kapat</string>
+    <string name="haptic_only_mode">Yalnızca haptik</string>
+    <string name="audio_mode">Ses + haptik</string>
+    <string name="normal_player_mode">Normal müzik çalar</string>
+    <string name="analysis_in_progress_title">Ritim analiz ediliyor</string>
+    <string name="analysis_in_progress_body">Bu parça için yeniden kullanılabilir bir dokunsal zaman çizelgesi hazırlanıyor.</string>
+    <string name="analysis_failed">Analiz başarısız oldu</string>
+    <string name="analysis_ready">Zaman çizelgesi hazır</string>
+    <string name="audio_only_title">Normal ses oynatımı</string>
+    <string name="audio_only_body">Haptik kapalı olduğu için bu parça analiz beklemeden normal bir müzik çalar gibi başlar.</string>
+    <string name="status_ready">Hazır</string>
+    <string name="status_analyzing">Analiz ediliyor</string>
+    <string name="status_stale">Yeniden analiz gerekiyor</string>
+    <string name="status_failed">Tekrar dene</string>
+    <string name="status_haptics_off">Haptik kapalı</string>
+    <string name="intensity">Şiddet</string>
+    <string name="tactile_profile">Dokunsal profil</string>
+    <string name="tactile_profile_value">Dokunsal profil %1$d%%</string>
+    <string name="time_minutes_seconds">%1$02d:%2$02d</string>
+    <string name="notification_fallback_artist">Ritme titreşimle eşlik ediyor</string>
+
+    <string name="settings_title">Ayarlar</string>
+    <string name="appearance">Görünüm</string>
+    <string name="app_language">Uygulama dili</string>
+    <string name="playback">Oynatma</string>
+    <string name="theme">Tema</string>
+    <string name="theme_system">Sistem</string>
+    <string name="theme_light">Açık</string>
+    <string name="theme_dark">Koyu</string>
+    <string name="theme_amoled">AMOLED (Premium)</string>
+    <string name="default_intensity">Varsayılan şiddet</string>
+    <string name="default_intensity_value">Varsayılan şiddet %1$d%%</string>
+    <string name="audio_on_default">Ses varsayılan olarak açık</string>
+    <string name="haptics_on_default">Haptik varsayılan olarak açık</string>
+    <string name="visual_haptics">Görsel ritim flaşı</string>
+    <string name="premium">Premium</string>
+    <string name="premium_user">Premium aktif</string>
+    <string name="unlock_premium">Premium’u Etkinleştir</string>
+    <string name="premium_desc">AMOLED temasının kilidini aç ve HapticBeats’in gelişimini destekle.</string>
+    <string name="promo_code">Promosyon kodu</string>
+    <string name="redeem_code">Kodu kullan</string>
+    <string name="advanced">Gelişmiş</string>
+    <string name="reanalyze_all">Tüm parçaları yeniden analiz et</string>
+    <string name="clear_cache">Kaydedilen zaman çizelgelerini temizle</string>
+    <string name="start">Başlat</string>
+    <string name="clear">Temizle</string>
+    <string name="about">Hakkında</string>
+    <string name="version">Sürüm 2.0.0</string>
+    <string name="contact">İletişim: support@hapticbeats.com</string>
+
+    <string name="skip">Atla</string>
+    <string name="next">İleri</string>
+    <string name="get_started">Başla</string>
+    <string name="tut_1_title">Müziğini ekle</string>
+    <string name="tut_1_desc">Cihazını bir kez tara ve oluşturulan her dokunsal zaman çizelgesini yeniden kullan.</string>
+    <string name="tut_2_title">Ritme kilitleniyoruz</string>
+    <string name="tut_2_desc">Yeni motor; ritmi, bası ve vurgu anlarını daha sıkı bir dokunsal akışa dönüştürür.</string>
+    <string name="tut_3_title">Daha güçlü etki hisset</string>
+    <string name="tut_3_desc">Oynatma artık parçalı titreşim patlamaları yerine tek ve tekrar kullanılabilir bir waveform kullanır.</string>
+    <string name="tut_4_title">Profilini ayarla</string>
+    <string name="tut_4_desc">Şiddeti ayarla, sesi aç veya kapat ve parçaya uyan hissi koru.</string>
+
+    <string name="nav_library">Kütüphane</string>
+    <string name="nav_player">Şimdi Çalıyor</string>
+    <string name="nav_settings">Ayarlar</string>
+
+    <string name="low_battery_warning">Pil düşük (&lt;15%%). Güçlü haptikler pili daha hızlı tüketebilir.</string>
+
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_english">English</string>
+    <string name="language_chinese_simplified">简体中文</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_french">Français</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_portuguese">Português</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_urdu">اردو</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+</resources>
