@@ -21,5 +21,8 @@ local.properties
 *.aab
 *.ap_
 *.dex
+!github-apks/
+!github-apks/*.apk
+!github-apks/README.md
 build_log*.txt
 *.log

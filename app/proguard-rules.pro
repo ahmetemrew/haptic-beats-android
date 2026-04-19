@@ -19,3 +19,6 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# jlargearrays references this legacy JDK class indirectly during shrink.
+-dontwarn sun.misc.Cleaner
