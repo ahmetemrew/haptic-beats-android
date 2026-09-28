@@ -4,18 +4,29 @@
     <string name="library_title">Library</string>
     <string name="library_subtitle">Scan once, feel instantly.</string>
     <string name="library_summary">%1$d tracks • %2$d ready</string>
-    <string name="library_ready_hint">Tap any track. Haptics lock in automatically.</string>
+    <string name="library_ready_hint">Tap any track to play with punchy haptics.</string>
     <string name="sync_library">Sync library</string>
     <string name="syncing">Syncing…</string>
     <string name="open_settings">Open settings</string>
     <string name="back">Back</string>
+
+    <string name="search_placeholder">Search title or artist…</string>
+    <string name="sort_title">Title</string>
+    <string name="sort_artist">Artist</string>
+    <string name="sort_duration">Duration</string>
+    <string name="sort_date">Recent</string>
+    <string name="play_next">Next</string>
+    <string name="play_previous">Previous</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="repeat">Repeat</string>
+    <string name="queue">Queue</string>
 
     <string name="no_tracks_title">No music found yet</string>
     <string name="no_tracks_body">Grant audio access and sync your device library to build tactile playback.</string>
     <string name="browse_library">Browse library</string>
 
     <string name="now_playing">Now Playing</string>
-    <string name="player_subtitle">A stronger haptic engine focused on bass and rhythm.</string>
+    <string name="player_subtitle">Precision haptic engine tuned to rhythm &amp; bass.</string>
     <string name="select_song">Select a track from Library</string>
     <string name="unknown_title">Unknown Title</string>
     <string name="unknown_artist">Unknown Artist</string>
@@ -35,11 +46,11 @@
     <string name="status_stale">Needs re-analysis</string>
     <string name="status_failed">Retry needed</string>
     <string name="status_haptics_off">Haptics off</string>
-    <string name="intensity">Intensity</string>
+    <string name="intensity">Haptic Intensity</string>
     <string name="tactile_profile">Tactile profile</string>
-    <string name="tactile_profile_value">Tactile profile %1$d%%</string>
+    <string name="tactile_profile_value">Haptic intensity %1$d%%</string>
     <string name="time_minutes_seconds">%1$02d:%2$02d</string>
-    <string name="notification_fallback_artist">Vibrating to the rhythm</string>
+    <string name="notification_fallback_artist">Pulsing with beat</string>
 
     <string name="settings_title">Settings</string>
     <string name="appearance">Appearance</string>
@@ -49,38 +60,27 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
-    <string name="theme_amoled">AMOLED (Premium)</string>
+    <string name="theme_amoled">AMOLED (Pure Black)</string>
     <string name="default_intensity">Default intensity</string>
     <string name="default_intensity_value">Default intensity %1$d%%</string>
+    <string name="haptic_profile_title">Tactile Perception Profile</string>
+    <string name="haptic_profile_balanced">Balanced &amp; Musical (Default)</string>
+    <string name="haptic_profile_balanced_desc">Deconstructs kick, snare, hi-hats, and melodic bassline.</string>
+    <string name="haptic_profile_deep_bass">Deep Bass &amp; 808 (Club / Trap)</string>
+    <string name="haptic_profile_deep_bass_desc">Overdrives sub-bass, 808 drops, and visceral chest-thumping kicks.</string>
+    <string name="haptic_profile_percussion">Sharp Percussion &amp; Rhythm (Acoustic / Rock)</string>
+    <string name="haptic_profile_percussion_desc">Accentuates snares, claps, hi-hat rolls, and crisp transients.</string>
     <string name="audio_on_default">Audio on by default</string>
     <string name="haptics_on_default">Haptics on by default</string>
-    <string name="visual_haptics">Visual pulse flash</string>
-    <string name="premium">Premium</string>
-    <string name="premium_user">Premium active</string>
-    <string name="unlock_premium">Activate Premium</string>
-    <string name="premium_desc">Unlock the AMOLED theme and support the continued development of HapticBeats.</string>
-    <string name="promo_code">Promo code</string>
-    <string name="redeem_code">Redeem code</string>
+    <string name="visual_haptics">Visual beat pulse</string>
     <string name="advanced">Advanced</string>
     <string name="reanalyze_all">Re-analyze all songs</string>
     <string name="clear_cache">Clear saved timelines</string>
     <string name="start">Start</string>
     <string name="clear">Clear</string>
     <string name="about">About</string>
-    <string name="version">Version 2.0.0</string>
+    <string name="version">Version 2.0.0 Pro</string>
     <string name="contact">Contact: support@hapticbeats.com</string>
-
-    <string name="skip">Skip</string>
-    <string name="next">Next</string>
-    <string name="get_started">Get started</string>
-    <string name="tut_1_title">Bring in your music</string>
-    <string name="tut_1_desc">Scan your device once and keep every analyzed timeline ready to reuse.</string>
-    <string name="tut_2_title">We lock onto the groove</string>
-    <string name="tut_2_desc">The new engine turns rhythm, bass, and transients into a tighter tactile pulse.</string>
-    <string name="tut_3_title">Feel stronger impact</string>
-    <string name="tut_3_desc">Playback now uses a single reusable waveform instead of fragmented vibration bursts.</string>
-    <string name="tut_4_title">Dial in your profile</string>
-    <string name="tut_4_desc">Adjust intensity, switch audio on or off, and keep the feel that matches the track.</string>
 
     <string name="nav_library">Library</string>
     <string name="nav_player">Now Playing</string>

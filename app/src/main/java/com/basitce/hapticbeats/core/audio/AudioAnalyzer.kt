@@ -79,6 +79,7 @@ class AudioAnalyzer(private val context: Context) {
         val vocalEnergyHistory = ArrayDeque<Double>(64)
         val rmsHistory = ArrayDeque<Double>(64)
         val amplitudes = mutableListOf<Int>()
+        val tones = mutableListOf<Byte>()
         val fft = DoubleFFT_1D(windowSize.toLong())
 
         var bufferedSamples = 0
@@ -207,6 +208,15 @@ class AudioAnalyzer(private val context: Context) {
                 amplitude = 0
             }
 
+            val toneCode = when {
+                amplitude == 0 -> HapticTone.SILENCE.code
+                pulseOnset > 1.10 -> HapticTone.KICK.code
+                percussionAccent > 1.15 -> HapticTone.SNARE.code
+                lowDrive > 1.15 -> HapticTone.BASS_NOTE.code
+                else -> HapticTone.KICK.code
+            }
+            tones += toneCode
+
             pushHistory(lowEnergyHistory, lowEnergy)
             pushHistory(pulseFluxHistory, pulseFlux)
             pushHistory(percussionFluxHistory, percussionLift)
@@ -319,7 +329,8 @@ class AudioAnalyzer(private val context: Context) {
                 }
             }
         } catch (_: Exception) {
-            return@withContext HapticTimeline(durationMs = durationUs / 1000, amplitudes = postProcessAmplitudes(amplitudes))
+            val processed = postProcessAmplitudes(amplitudes)
+            return@withContext HapticTimeline(durationMs = durationUs / 1000, amplitudes = processed, tones = tones.toByteArray().copyOf(processed.size), stepMs = HAPTIC_TIMELINE_STEP_MS)
         } finally {
             runCatching { codec.stop() }
             runCatching { codec.release() }
@@ -336,10 +347,14 @@ class AudioAnalyzer(private val context: Context) {
         } else {
             processedAmplitudes
         }
+        val paddedTones = ByteArray(paddedAmplitudes.size) { index ->
+            tones.getOrElse(index) { HapticTone.SILENCE.code }
+        }
 
         HapticTimeline(
             durationMs = durationMs,
             amplitudes = paddedAmplitudes,
+            tones = paddedTones,
             stepMs = HAPTIC_TIMELINE_STEP_MS
         )
     }

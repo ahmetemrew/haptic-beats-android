@@ -74,8 +74,8 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     kapt(libs.androidx.room.compiler)
 
-    // Billing
-    implementation(libs.google.play.billing)
+    // Coil (Album Art Image Loading)
+    implementation(libs.coil.compose)
 
     // Utils
     implementation(libs.jtransforms)

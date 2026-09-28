@@ -1,37 +1,41 @@
 package com.basitce.hapticbeats.ui.playback
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -44,22 +48,31 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.basitce.hapticbeats.R
 import com.basitce.hapticbeats.core.data.SongAnalysisState
+import com.basitce.hapticbeats.core.player.RepeatMode
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PlaybackScreen(
     viewModel: PlaybackViewModel,
@@ -74,11 +87,14 @@ fun PlaybackScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp)
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Top Navigation Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             IconButton(onClick = onBrowseLibrary) {
                 Icon(
@@ -88,26 +104,21 @@ fun PlaybackScreen(
                 )
             }
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = stringResource(R.string.now_playing),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = stringResource(R.string.player_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center
+                    text = when {
+                        uiState.isAudioEnabled && uiState.isHapticsEnabled -> stringResource(R.string.audio_mode)
+                        uiState.isAudioEnabled -> stringResource(R.string.normal_player_mode)
+                        else -> stringResource(R.string.haptic_only_mode)
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
                 )
             }
 
@@ -120,157 +131,140 @@ fun PlaybackScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         if (uiState.selectedSong == null) {
             EmptyPlaybackState(onBrowseLibrary = onBrowseLibrary)
         } else {
-            val flashTransition = rememberInfiniteTransition(label = "player_flash")
-            val flashAlpha by flashTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = if (uiState.isPlaying && isVisualHapticsEnabled && uiState.isHapticsEnabled) 0.18f else 0f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(500, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse
+            // Dynamic real-time multimodal beat pulse:
+            // Synchronously springs outward with the physical motor thump of kicks and snares
+            val targetPulseScale = if (uiState.isPlaying && isVisualHapticsEnabled && uiState.isHapticsEnabled) {
+                1.0f + ((uiState.currentHapticAmplitude / 255f) * 0.075f)
+            } else {
+                1.0f
+            }
+            val pulseScale by animateFloatAsState(
+                targetValue = targetPulseScale,
+                animationSpec = spring(
+                    dampingRatio = 0.55f,
+                    stiffness = 900f
                 ),
-                label = "player_flash_alpha"
+                label = "beatPulse"
             )
 
+            // Album Artwork Card
             Card(
-                shape = RoundedCornerShape(32.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(28.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+                modifier = Modifier
+                    .fillMaxWidth(0.88f)
+                    .aspectRatio(1f)
+                    .scale(pulseScale)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                                    MaterialTheme.colorScheme.surface
-                                )
-                            )
-                        )
-                        .padding(24.dp)
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(220.dp)
-                            .clip(RoundedCornerShape(26.dp))
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
-                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.68f),
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                    if (!uiState.albumArtUri.isNullOrBlank()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(uiState.albumArtUri)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = uiState.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.secondary,
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                        )
                                     )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (flashAlpha > 0f) {
-                            Box(
-                                modifier = Modifier
-                                    .matchParentSize()
-                                    .background(Color.White.copy(alpha = flashAlpha))
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MusicNote,
+                                contentDescription = null,
+                                modifier = Modifier.size(96.dp),
+                                tint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
-                        Icon(
-                            imageVector = Icons.Default.GraphicEq,
-                            contentDescription = null,
-                            modifier = Modifier.size(82.dp),
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    Text(
-                        text = uiState.title.ifBlank { stringResource(R.string.unknown_title) },
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = uiState.artist.ifBlank { stringResource(R.string.unknown_artist) },
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ModeChip(
-                            label = when {
-                                uiState.isAudioEnabled && uiState.isHapticsEnabled -> stringResource(R.string.audio_mode)
-                                uiState.isAudioEnabled -> stringResource(R.string.normal_player_mode)
-                                else -> stringResource(R.string.haptic_only_mode)
-                            }
-                        )
-                        StatusChip(
-                            analysisState = uiState.analysisState,
-                            isHapticsEnabled = uiState.isHapticsEnabled
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    if (!uiState.isHapticsEnabled) {
-                        AudioOnlyCard()
-                    } else {
-                        TimelinePreview(
-                            bars = uiState.previewBars,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    if (uiState.isHapticsEnabled) {
-                        Text(
-                            text = stringResource(R.string.intensity),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Slider(
-                            value = uiState.intensity,
-                            onValueChange = { viewModel.setIntensity(it) },
-                            valueRange = 0.2f..1.2f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    // Beat analyzing indicator overlay
+                    if (uiState.isAnalyzing) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = stringResource(R.string.status_analyzing),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
                             )
-                        )
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        Text(
-                            text = stringResource(
-                                R.string.tactile_profile_value,
-                                (uiState.intensity * 100).toInt()
-                            ),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Title & Artist
+            Text(
+                text = uiState.title.ifBlank { stringResource(R.string.unknown_title) },
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = uiState.artist.ifBlank { stringResource(R.string.unknown_artist) },
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Interactive Waveform Visualizer
+            if (uiState.isHapticsEnabled) {
+                InteractiveTimelinePreview(
+                    bars = uiState.previewBars,
+                    progress = if (uiState.duration > 0) uiState.currentPosition.toFloat() / uiState.duration.toFloat() else 0f,
+                    currentAmplitude = uiState.currentHapticAmplitude,
+                    onSeek = { ratio ->
+                        viewModel.seekTo((ratio * uiState.duration).toLong())
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                AudioOnlyBanner()
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Scrubbing Slider & Time Stamps
             Slider(
                 value = if (uiState.duration > 0) {
-                    uiState.currentPosition.toFloat() / uiState.duration.toFloat()
+                    (uiState.currentPosition.toFloat() / uiState.duration.toFloat()).coerceIn(0f, 1f)
                 } else {
                     0f
                 },
@@ -279,8 +273,8 @@ fun PlaybackScreen(
                 },
                 enabled = uiState.duration > 0,
                 colors = SliderDefaults.colors(
-                    thumbColor = MaterialTheme.colorScheme.secondary,
-                    activeTrackColor = MaterialTheme.colorScheme.secondary,
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
                     inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             )
@@ -291,75 +285,165 @@ fun PlaybackScreen(
             ) {
                 Text(
                     text = formatTime(uiState.currentPosition),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = formatTime(uiState.duration),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Main Playback Controls: Shuffle, Previous, Play/Pause, Next, Repeat
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = { viewModel.toggleAudio() },
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface)
-                ) {
+                // Shuffle Button
+                IconButton(onClick = { viewModel.toggleShuffle() }) {
                     Icon(
-                        imageVector = if (uiState.isAudioEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-                        contentDescription = stringResource(R.string.toggle_sound),
-                        tint = MaterialTheme.colorScheme.onSurface
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = stringResource(R.string.shuffle),
+                        tint = if (uiState.isShuffleEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(26.dp)
                     )
                 }
 
-                Button(
-                    onClick = {
-                        if (uiState.isPlaying) viewModel.pause() else viewModel.play()
-                    },
-                    enabled = uiState.canPlay,
+                // Previous Track Button
+                IconButton(
+                    onClick = { viewModel.playPrevious() },
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SkipPrevious,
+                        contentDescription = stringResource(R.string.play_previous),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(34.dp)
+                    )
+                }
+
+                // Center Play/Pause Floating Button
+                Surface(
                     shape = CircleShape,
-                    modifier = Modifier.size(84.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    color = MaterialTheme.colorScheme.primary,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.size(76.dp)
+                ) {
+                    IconButton(
+                        onClick = {
+                            if (uiState.isPlaying) viewModel.pause() else viewModel.play()
+                        },
+                        enabled = uiState.canPlay,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = stringResource(R.string.nav_player),
+                            modifier = Modifier.size(38.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+
+                // Next Track Button
+                IconButton(
+                    onClick = { viewModel.playNext() },
+                    modifier = Modifier.size(52.dp)
                 ) {
                     Icon(
-                        imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = stringResource(R.string.nav_player),
-                        modifier = Modifier.size(34.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
+                        imageVector = Icons.Default.SkipNext,
+                        contentDescription = stringResource(R.string.play_next),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(34.dp)
                     )
                 }
 
-                IconButton(
-                    onClick = { viewModel.toggleHaptics() },
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface)
-                ) {
+                // Repeat Mode Button
+                IconButton(onClick = { viewModel.toggleRepeat() }) {
                     Icon(
-                        imageVector = Icons.Default.GraphicEq,
-                        contentDescription = stringResource(R.string.toggle_haptics),
-                        tint = if (uiState.isHapticsEnabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
+                        imageVector = if (uiState.repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                        contentDescription = stringResource(R.string.repeat),
+                        tint = if (uiState.repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(26.dp)
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Bottom Haptic Intensity & Controls Card
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.GraphicEq,
+                                contentDescription = null,
+                                tint = if (uiState.isHapticsEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = stringResource(R.string.tactile_profile_value, (uiState.intensity * 100).toInt()),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Row {
+                            IconButton(onClick = { viewModel.toggleAudio() }) {
+                                Icon(
+                                    imageVector = if (uiState.isAudioEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                                    contentDescription = stringResource(R.string.toggle_sound),
+                                    tint = if (uiState.isAudioEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            IconButton(onClick = { viewModel.toggleHaptics() }) {
+                                Icon(
+                                    imageVector = Icons.Default.GraphicEq,
+                                    contentDescription = stringResource(R.string.toggle_haptics),
+                                    tint = if (uiState.isHapticsEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (uiState.isHapticsEnabled) {
+                        Slider(
+                            value = uiState.intensity,
+                            onValueChange = { viewModel.setIntensity(it) },
+                            valueRange = 0.2f..1.5f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
     }
 }
 
@@ -371,20 +455,33 @@ private fun EmptyPlaybackState(onBrowseLibrary: () -> Unit) {
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Icon(
+                imageVector = Icons.Default.MusicNote,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+            )
             Text(
                 text = stringResource(R.string.select_song),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = stringResource(R.string.player_subtitle),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Button(onClick = onBrowseLibrary) {
+            Button(
+                onClick = onBrowseLibrary,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
                 Text(text = stringResource(R.string.browse_library))
             }
         }
@@ -392,24 +489,25 @@ private fun EmptyPlaybackState(onBrowseLibrary: () -> Unit) {
 }
 
 @Composable
-private fun AudioOnlyCard() {
+private fun AudioOnlyBanner() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text = stringResource(R.string.audio_only_title),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = stringResource(R.string.audio_only_body),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -417,127 +515,92 @@ private fun AudioOnlyCard() {
 }
 
 @Composable
-private fun ModeChip(label: String) {
-    Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.16f))
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.secondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun StatusChip(
-    analysisState: String,
-    isHapticsEnabled: Boolean
-) {
-    if (!isHapticsEnabled) {
-        Box(
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.status_haptics_off),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        return
-    }
-
-    if (analysisState != SongAnalysisState.READY) {
-        return
-    }
-
-    val label = stringResource(R.string.status_ready)
-    val tint = MaterialTheme.colorScheme.secondary
-
-    Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(tint.copy(alpha = 0.14f))
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = tint,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun TimelinePreview(
+private fun InteractiveTimelinePreview(
     bars: List<Int>,
+    progress: Float,
+    currentAmplitude: Int = 0,
+    onSeek: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val safeBars = if (bars.isEmpty()) List(32) { 0 } else bars
-    val baselineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val safeBars = if (bars.isEmpty()) List(36) { 0 } else bars
+    val playedColor = MaterialTheme.colorScheme.primary
+    val unplayedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+    val baselineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
     ) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(116.dp)
-                .padding(horizontal = 14.dp, vertical = 18.dp)
+                .height(84.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        val ratio = (offset.x / size.width).coerceIn(0f, 1f)
+                        onSeek(ratio)
+                    }
+                }
         ) {
             val baseline = size.height / 2
-            val barSpacing = 6.dp.toPx()
-            val availableWidth = size.width - (barSpacing * (safeBars.size - 1))
+            val barSpacing = 4.dp.toPx()
+            val totalWidth = size.width
+            val availableWidth = totalWidth - (barSpacing * (safeBars.size - 1))
             val barWidth = availableWidth / safeBars.size
-            val strokeWidth = (barWidth * 0.82f).coerceAtLeast(4.dp.toPx())
+            val strokeWidth = (barWidth * 0.85f).coerceAtLeast(3.dp.toPx())
 
             drawLine(
                 color = baselineColor,
                 start = androidx.compose.ui.geometry.Offset(0f, baseline),
-                end = androidx.compose.ui.geometry.Offset(size.width, baseline),
+                end = androidx.compose.ui.geometry.Offset(totalWidth, baseline),
                 strokeWidth = 1.dp.toPx(),
                 cap = StrokeCap.Round
             )
 
             safeBars.forEachIndexed { index, amplitude ->
+                val barProgress = index.toFloat() / safeBars.size.toFloat()
+                val isPlayed = barProgress <= progress
                 val normalized = (amplitude / 255f).coerceIn(0f, 1f)
-                val barHeight = (normalized * (size.height * 0.42f)).coerceAtLeast(6.dp.toPx())
+                val barHeight = (normalized * (size.height * 0.42f)).coerceAtLeast(4.dp.toPx())
                 val x = index * (barWidth + barSpacing) + (barWidth / 2)
+
                 drawLine(
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            secondaryColor,
-                            primaryColor
-                        )
-                    ),
+                    color = if (isPlayed) playedColor else unplayedColor,
                     start = androidx.compose.ui.geometry.Offset(x, baseline - barHeight),
                     end = androidx.compose.ui.geometry.Offset(x, baseline + barHeight),
                     strokeWidth = strokeWidth,
                     cap = StrokeCap.Round
                 )
             }
+
+            // Real-time Glowing Playhead Needle & Beat Pulse Dot
+            if (progress in 0f..1f) {
+                val playheadX = progress * totalWidth
+                val needleHeight = size.height * 0.46f
+                val glowRadius = 3.dp.toPx() + ((currentAmplitude / 255f) * 6.dp.toPx())
+
+                drawLine(
+                    color = playedColor,
+                    start = androidx.compose.ui.geometry.Offset(playheadX, baseline - needleHeight),
+                    end = androidx.compose.ui.geometry.Offset(playheadX, baseline + needleHeight),
+                    strokeWidth = 2.5.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+                drawCircle(
+                    color = playedColor,
+                    radius = glowRadius,
+                    center = androidx.compose.ui.geometry.Offset(playheadX, baseline)
+                )
+            }
         }
     }
 }
 
-@Composable
 fun formatTime(ms: Long): String {
-    val seconds = (ms / 1_000) % 60
-    val minutes = (ms / 60_000) % 60
-    return stringResource(R.string.time_minutes_seconds, minutes, seconds)
+    val totalSeconds = (ms / 1_000).coerceAtLeast(0)
+    val seconds = totalSeconds % 60
+    val minutes = (totalSeconds / 60) % 60
+    return "%02d:%02d".format(minutes, seconds)
 }

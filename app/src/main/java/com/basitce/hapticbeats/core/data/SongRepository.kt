@@ -47,6 +47,7 @@ class SongRepository(
     }
 
     suspend fun loadTimeline(song: Song): HapticTimeline? {
+        if (song.analysisVersion != CURRENT_ANALYSIS_VERSION) return null
         val patternKey = song.patternKey ?: return null
         return patternStore.load(patternKey)
     }

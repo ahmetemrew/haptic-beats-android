@@ -49,12 +49,19 @@ class HapticPatternStore(context: Context) {
                 val magic = input.readUTF()
                 require(magic == "HBTL") { "Invalid pattern file" }
                 val version = input.readInt()
-                require(version == 1) { "Unsupported pattern version" }
+                require(version in 1..2) { "Unsupported pattern version" }
                 val stepMs = input.readInt()
                 val durationMs = input.readLong()
                 val count = input.readInt()
                 val amplitudes = IntArray(count) { input.readUnsignedByte() }
-                HapticTimeline(durationMs = durationMs, amplitudes = amplitudes, stepMs = stepMs)
+                val tones = if (version >= 2) {
+                    val toneArray = ByteArray(count)
+                    input.readFully(toneArray)
+                    toneArray
+                } else {
+                    ByteArray(count)
+                }
+                HapticTimeline(durationMs = durationMs, amplitudes = amplitudes, tones = tones, stepMs = stepMs)
             }
         }.getOrNull()?.also { memoryCache.put(patternKey, it) }
     }
@@ -63,11 +70,17 @@ class HapticPatternStore(context: Context) {
         val file = patternFile(patternKey)
         DataOutputStream(FileOutputStream(file)).use { output ->
             output.writeUTF("HBTL")
-            output.writeInt(1)
+            output.writeInt(2)
             output.writeInt(timeline.stepMs)
             output.writeLong(timeline.durationMs)
             output.writeInt(timeline.amplitudes.size)
             timeline.amplitudes.forEach { output.writeByte(it.coerceIn(0, 255)) }
+            val tonesToWrite = if (timeline.tones.size == timeline.amplitudes.size) {
+                timeline.tones
+            } else {
+                ByteArray(timeline.amplitudes.size)
+            }
+            output.write(tonesToWrite)
         }
         memoryCache.put(patternKey, timeline)
     }

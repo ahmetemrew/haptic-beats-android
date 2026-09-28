@@ -1,74 +1,45 @@
 package com.basitce.hapticbeats.core.service
 
 import android.app.PendingIntent
-import android.app.Service
 import android.content.Intent
-import android.os.IBinder
-import androidx.media3.common.Player
-import androidx.media3.ui.PlayerNotificationManager
+import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSessionService
+import com.basitce.hapticbeats.MainActivity
 import com.basitce.hapticbeats.MyApplication
-import com.basitce.hapticbeats.R
 
-class HapticService : Service() {
-    companion object {
-        private const val NOTIFICATION_CHANNEL_ID = "HapticBeatsChannel"
-    }
+class HapticService : MediaSessionService() {
 
-    private lateinit var playerNotificationManager: PlayerNotificationManager
+    private var mediaSession: MediaSession? = null
 
     override fun onCreate() {
         super.onCreate()
         val app = application as MyApplication
         val player = app.hapticPlayer.exoPlayer
 
-        playerNotificationManager = PlayerNotificationManager.Builder(
+        val sessionActivityIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val sessionActivityPendingIntent = PendingIntent.getActivity(
             this,
-            101,
-            NOTIFICATION_CHANNEL_ID
+            0,
+            sessionActivityIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        .setChannelNameResourceId(R.string.app_name)
-        .setChannelDescriptionResourceId(R.string.app_name)
-        .setMediaDescriptionAdapter(object : PlayerNotificationManager.MediaDescriptionAdapter {
-            override fun getCurrentContentTitle(player: Player): CharSequence {
-                return player.mediaMetadata.title ?: getString(R.string.app_name)
-            }
 
-            override fun createCurrentContentIntent(player: Player): PendingIntent? {
-                val intent = Intent(this@HapticService, com.basitce.hapticbeats.MainActivity::class.java)
-                return PendingIntent.getActivity(
-                    this@HapticService, 
-                    0, 
-                    intent, 
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-            }
-
-            override fun getCurrentContentText(player: Player): CharSequence? {
-                return player.mediaMetadata.artist ?: getString(R.string.notification_fallback_artist)
-            }
-
-            override fun getCurrentLargeIcon(
-                player: Player,
-                callback: PlayerNotificationManager.BitmapCallback
-            ): android.graphics.Bitmap? {
-                return null
-            }
-        })
-        .build()
-
-        playerNotificationManager.setPlayer(player)
+        mediaSession = MediaSession.Builder(this, player)
+            .setSessionActivity(sessionActivityPendingIntent)
+            .build()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+        return mediaSession
     }
 
     override fun onDestroy() {
-        playerNotificationManager.setPlayer(null)
+        mediaSession?.run {
+            release()
+            mediaSession = null
+        }
         super.onDestroy()
-    }
-
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
     }
 }

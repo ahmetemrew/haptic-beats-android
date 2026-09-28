@@ -20,7 +20,6 @@ class MainActivity : AppCompatActivity() {
 
         val settingsFactory = com.basitce.hapticbeats.ui.settings.SettingsViewModelFactory(
             app,
-            app.billingManager,
             app.hapticPlayer,
             app.repository
         )

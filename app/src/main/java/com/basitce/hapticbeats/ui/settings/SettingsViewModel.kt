@@ -1,14 +1,18 @@
 package com.basitce.hapticbeats.ui.settings
 
-import android.app.Activity
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.basitce.hapticbeats.core.data.SongRepository
+import com.basitce.hapticbeats.core.haptics.HapticProfile
 import com.basitce.hapticbeats.core.localization.AppLanguageManager
 import com.basitce.hapticbeats.core.localization.AppLanguageOption
+import com.basitce.hapticbeats.core.player.HapticPlayer
 import com.basitce.hapticbeats.ui.theme.ThemeMode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,19 +20,18 @@ import kotlinx.coroutines.launch
 
 data class SettingsUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val isPremium: Boolean = false,
-    val defaultIntensity: Float = 0.8f,
+    val defaultIntensity: Float = 1.0f,
+    val hapticProfile: HapticProfile = HapticProfile.BALANCED,
     val isAudioEnabled: Boolean = true,
     val isHapticsEnabled: Boolean = true,
-    val isVisualHapticsEnabled: Boolean = false,
+    val isVisualHapticsEnabled: Boolean = true,
     val selectedLanguageTag: String = AppLanguageManager.DEFAULT_LANGUAGE_TAG,
     val availableLanguages: List<AppLanguageOption> = AppLanguageManager.supportedLanguages
 )
 
 class SettingsViewModel(
     application: Application,
-    private val billingManager: com.basitce.hapticbeats.core.billing.BillingManager,
-    private val hapticPlayer: com.basitce.hapticbeats.core.player.HapticPlayer,
+    private val hapticPlayer: HapticPlayer,
     private val repository: SongRepository
 ) : AndroidViewModel(application) {
 
@@ -39,23 +42,6 @@ class SettingsViewModel(
 
     init {
         loadSettings()
-        observeBilling()
-    }
-
-    private fun observeBilling() {
-        viewModelScope.launch {
-            billingManager.isPremium.collect { isBillingPremium ->
-                val isPromoPremium = prefs.getBoolean("is_premium_promo", false)
-                val finalPremiumStatus = isBillingPremium || isPromoPremium
-
-                _uiState.value = _uiState.value.copy(isPremium = finalPremiumStatus)
-                prefs.edit().putBoolean("is_premium", isBillingPremium).apply()
-            }
-        }
-    }
-
-    fun purchasePremium(activity: Activity) {
-        billingManager.launchPurchaseFlow(activity)
     }
 
     fun toggleAudio(isEnabled: Boolean) {
@@ -79,13 +65,6 @@ class SettingsViewModel(
         _uiState.value = _uiState.value.copy(isVisualHapticsEnabled = isEnabled)
     }
 
-    fun submitPromoCode(code: String) {
-        if (code == "ciki50k" || code == "çiki50k" || code == "Ã§iki50k") {
-            prefs.edit().putBoolean("is_premium_promo", true).apply()
-            _uiState.value = _uiState.value.copy(isPremium = true)
-        }
-    }
-
     fun setLanguage(languageTag: String) {
         val safeLanguageTag = AppLanguageManager.updateLanguage(getApplication(), languageTag)
         _uiState.value = _uiState.value.copy(selectedLanguageTag = safeLanguageTag)
@@ -97,26 +76,31 @@ class SettingsViewModel(
     }
 
     fun setIntensity(intensity: Float) {
-        prefs.edit().putFloat("default_intensity", intensity).apply()
-        _uiState.value = _uiState.value.copy(defaultIntensity = intensity)
-        hapticPlayer.intensity = intensity
+        val clamped = intensity.coerceIn(0.2f, 1.5f)
+        prefs.edit().putFloat("default_intensity", clamped).apply()
+        _uiState.value = _uiState.value.copy(defaultIntensity = clamped)
+        hapticPlayer.intensity = clamped
+    }
+
+    fun setHapticProfile(profile: HapticProfile) {
+        prefs.edit().putString("haptic_profile", profile.name).apply()
+        _uiState.value = _uiState.value.copy(hapticProfile = profile)
+        hapticPlayer.hapticProfile = profile
     }
 
     fun clearCache() {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.clearPatterns()
         }
     }
 
     fun reanalyzeAll() {
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.markAllForReanalysis()
         }
     }
 
     private fun loadSettings() {
-        val isPromoPremium = prefs.getBoolean("is_premium_promo", false)
-        val isBillingPremium = prefs.getBoolean("is_premium", false)
         val themeModeName = prefs.getString("theme_mode", ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
         val themeMode = try {
             ThemeMode.valueOf(themeModeName)
@@ -127,24 +111,35 @@ class SettingsViewModel(
             audioEnabled = prefs.getBoolean("audio_enabled", true),
             hapticsEnabled = prefs.getBoolean("haptics_enabled", true)
         )
+        val defaultIntensity = prefs.getFloat("default_intensity", 1.0f)
+        val profileName = prefs.getString("haptic_profile", HapticProfile.BALANCED.name) ?: HapticProfile.BALANCED.name
+        val hapticProfile = try {
+            HapticProfile.valueOf(profileName)
+        } catch (_: Exception) {
+            HapticProfile.BALANCED
+        }
 
         _uiState.value = SettingsUiState(
             themeMode = themeMode,
-            isPremium = isPromoPremium || isBillingPremium,
-            defaultIntensity = prefs.getFloat("default_intensity", 0.8f),
+            defaultIntensity = defaultIntensity,
+            hapticProfile = hapticProfile,
             isAudioEnabled = audioEnabled,
             isHapticsEnabled = hapticsEnabled,
-            isVisualHapticsEnabled = prefs.getBoolean("visual_haptics_enabled", false),
+            isVisualHapticsEnabled = prefs.getBoolean("visual_haptics_enabled", true),
             selectedLanguageTag = AppLanguageManager.storedLanguageTag(getApplication())
         )
 
         prefs.edit()
             .putBoolean("audio_enabled", audioEnabled)
             .putBoolean("haptics_enabled", hapticsEnabled)
+            .putFloat("default_intensity", defaultIntensity)
+            .putString("haptic_profile", hapticProfile.name)
             .apply()
-        hapticPlayer.intensity = _uiState.value.defaultIntensity
-        hapticPlayer.isAudioEnabled = _uiState.value.isAudioEnabled
-        hapticPlayer.isVibrationEnabled = _uiState.value.isHapticsEnabled
+
+        hapticPlayer.intensity = defaultIntensity
+        hapticPlayer.hapticProfile = hapticProfile
+        hapticPlayer.isAudioEnabled = audioEnabled
+        hapticPlayer.isVibrationEnabled = hapticsEnabled
     }
 
     private fun persistOutputState(audioEnabled: Boolean, hapticsEnabled: Boolean) {
@@ -171,14 +166,13 @@ class SettingsViewModel(
 
 class SettingsViewModelFactory(
     private val application: Application,
-    private val billingManager: com.basitce.hapticbeats.core.billing.BillingManager,
-    private val hapticPlayer: com.basitce.hapticbeats.core.player.HapticPlayer,
+    private val hapticPlayer: HapticPlayer,
     private val repository: SongRepository
-) : androidx.lifecycle.ViewModelProvider.Factory {
-    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return SettingsViewModel(application, billingManager, hapticPlayer, repository) as T
+            return SettingsViewModel(application, hapticPlayer, repository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

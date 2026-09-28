@@ -1,6 +1,7 @@
 package com.basitce.hapticbeats
 
 import android.app.Application
+import android.content.Context
 import com.basitce.hapticbeats.core.audio.AudioAnalyzer
 import com.basitce.hapticbeats.core.audio.HapticPatternStore
 import com.basitce.hapticbeats.core.haptics.VibrationManager
@@ -17,20 +18,21 @@ class MyApplication : Application() {
     val patternStore by lazy { HapticPatternStore(this) }
     val repository by lazy { com.basitce.hapticbeats.core.data.SongRepository(database.songDao(), patternStore) }
 
-    lateinit var billingManager: com.basitce.hapticbeats.core.billing.BillingManager
-
     override fun onCreate() {
         super.onCreate()
         AppLanguageManager.ensureLanguageApplied(this)
 
+        val prefs = getSharedPreferences("hapticbeats_prefs", Context.MODE_PRIVATE)
+        if (!prefs.contains("default_intensity")) {
+            prefs.edit().putFloat("default_intensity", 1.0f).apply()
+        }
+
         audioAnalyzer = AudioAnalyzer(this)
         vibrationManager = VibrationManager(this)
-        hapticPlayer = HapticPlayer(this, vibrationManager)
-
-        billingManager = com.basitce.hapticbeats.core.billing.BillingManager(this) { isPremium ->
-            val prefs = getSharedPreferences("hapticbeats_prefs", android.content.Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("is_premium", isPremium).apply()
+        hapticPlayer = HapticPlayer(this, vibrationManager).apply {
+            intensity = prefs.getFloat("default_intensity", 1.0f)
+            isAudioEnabled = prefs.getBoolean("audio_enabled", true)
+            isVibrationEnabled = prefs.getBoolean("haptics_enabled", true)
         }
-        billingManager.startConnection()
     }
 }

@@ -13,6 +13,7 @@ import com.basitce.hapticbeats.core.data.Song
 import com.basitce.hapticbeats.core.data.SongAnalysisState
 import com.basitce.hapticbeats.core.data.SongRepository
 import com.basitce.hapticbeats.core.player.HapticPlayer
+import com.basitce.hapticbeats.core.player.RepeatMode
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,15 +26,21 @@ data class PlaybackUiState(
     val selectedSong: Song? = null,
     val title: String = "",
     val artist: String = "",
+    val albumArtUri: String? = null,
     val isPlaying: Boolean = false,
     val duration: Long = 0L,
     val currentPosition: Long = 0L,
-    val intensity: Float = 0.8f,
+    val intensity: Float = 1.0f,
     val isAnalyzing: Boolean = false,
     val isAudioEnabled: Boolean = true,
     val isHapticsEnabled: Boolean = true,
+    val isShuffleEnabled: Boolean = false,
+    val repeatMode: RepeatMode = RepeatMode.OFF,
+    val hasNext: Boolean = false,
+    val hasPrevious: Boolean = false,
     val analysisState: String = SongAnalysisState.MISSING,
-    val previewBars: List<Int> = emptyList()
+    val previewBars: List<Int> = emptyList(),
+    val currentHapticAmplitude: Int = 0
 ) {
     val canPlay: Boolean
         get() = selectedSong != null
@@ -52,7 +59,7 @@ class PlaybackViewModel(
 
     private val _uiState = MutableStateFlow(
         PlaybackUiState(
-            intensity = prefs.getFloat("default_intensity", 0.8f),
+            intensity = prefs.getFloat("default_intensity", 1.0f),
             isAudioEnabled = prefs.getBoolean("audio_enabled", true),
             isHapticsEnabled = prefs.getBoolean("haptics_enabled", true)
         )
@@ -65,13 +72,32 @@ class PlaybackViewModel(
             hapticsEnabled = _uiState.value.isHapticsEnabled,
             intensity = _uiState.value.intensity
         )
+        hapticPlayer.onSongEnded = {
+            playNext()
+        }
         startProgressUpdater()
     }
 
-    fun loadSong(song: Song) {
+    fun loadSong(song: Song, queue: List<Song> = emptyList()) {
+        if (queue.isNotEmpty()) {
+            hapticPlayer.setQueue(queue, song)
+        }
         viewModelScope.launch {
             val uri = Uri.parse(song.uri)
             val cachedTimeline = repository.loadTimeline(song)
+
+            _uiState.value = _uiState.value.copy(
+                selectedSong = song,
+                title = song.title,
+                artist = song.artist,
+                albumArtUri = song.albumArtUri,
+                duration = song.duration,
+                currentPosition = 0L,
+                hasNext = hapticPlayer.hasNext(),
+                hasPrevious = hapticPlayer.hasPrevious(),
+                isShuffleEnabled = hapticPlayer.isShuffleEnabled,
+                repeatMode = hapticPlayer.repeatMode
+            )
 
             if (!uiState.value.isHapticsEnabled) {
                 analysisJob?.cancel()
@@ -87,11 +113,6 @@ class PlaybackViewModel(
             ) {
                 hapticPlayer.restartCurrent()
                 _uiState.value = _uiState.value.copy(
-                    selectedSong = song,
-                    title = song.title,
-                    artist = song.artist,
-                    duration = song.duration,
-                    currentPosition = 0L,
                     previewBars = cachedTimeline.previewBars(),
                     isAnalyzing = false,
                     analysisState = SongAnalysisState.READY
@@ -106,14 +127,11 @@ class PlaybackViewModel(
                     timeline = cachedTimeline,
                     title = song.title,
                     artist = song.artist,
-                    patternKey = song.patternKey
+                    patternKey = song.patternKey,
+                    albumArtUri = song.albumArtUri,
+                    song = song
                 )
                 _uiState.value = _uiState.value.copy(
-                    selectedSong = song,
-                    title = song.title,
-                    artist = song.artist,
-                    duration = song.duration,
-                    currentPosition = 0L,
                     previewBars = cachedTimeline.previewBars(),
                     isAnalyzing = false,
                     analysisState = SongAnalysisState.READY
@@ -130,16 +148,13 @@ class PlaybackViewModel(
                     timeline = null,
                     title = song.title,
                     artist = song.artist,
-                    patternKey = null
+                    patternKey = null,
+                    albumArtUri = song.albumArtUri,
+                    song = song
                 )
             }
 
             _uiState.value = _uiState.value.copy(
-                selectedSong = song,
-                title = song.title,
-                artist = song.artist,
-                duration = song.duration,
-                currentPosition = 0L,
                 previewBars = emptyList(),
                 isAnalyzing = true,
                 analysisState = SongAnalysisState.ANALYZING
@@ -148,6 +163,44 @@ class PlaybackViewModel(
             play()
             startDeferredAnalysis(song, uri)
         }
+    }
+
+    fun playNext() {
+        val next = hapticPlayer.getNextSong()
+        if (next != null) {
+            loadSong(next)
+        }
+    }
+
+    fun playPrevious() {
+        val prev = hapticPlayer.getPreviousSong()
+        if (prev != null) {
+            loadSong(prev)
+        }
+    }
+
+    fun toggleShuffle() {
+        val newState = !hapticPlayer.isShuffleEnabled
+        hapticPlayer.isShuffleEnabled = newState
+        _uiState.value = _uiState.value.copy(
+            isShuffleEnabled = newState,
+            hasNext = hapticPlayer.hasNext(),
+            hasPrevious = hapticPlayer.hasPrevious()
+        )
+    }
+
+    fun toggleRepeat() {
+        val nextMode = when (hapticPlayer.repeatMode) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
+        }
+        hapticPlayer.repeatMode = nextMode
+        _uiState.value = _uiState.value.copy(
+            repeatMode = nextMode,
+            hasNext = hapticPlayer.hasNext(),
+            hasPrevious = hapticPlayer.hasPrevious()
+        )
     }
 
     fun play() {
@@ -194,7 +247,7 @@ class PlaybackViewModel(
     }
 
     fun setIntensity(intensity: Float) {
-        val clampedValue = intensity.coerceIn(0.2f, 1.2f)
+        val clampedValue = intensity.coerceIn(0.2f, 1.5f)
         applyOutputSettings(
             audioEnabled = _uiState.value.isAudioEnabled,
             hapticsEnabled = _uiState.value.isHapticsEnabled,
@@ -208,7 +261,7 @@ class PlaybackViewModel(
         intensity: Float
     ) {
         val (safeAudioEnabled, safeHapticsEnabled) = enforceAtLeastOneOutput(audioEnabled, hapticsEnabled)
-        val clampedIntensity = intensity.coerceIn(0.2f, 1.2f)
+        val clampedIntensity = intensity.coerceIn(0.2f, 1.5f)
         prefs.edit()
             .putBoolean("audio_enabled", safeAudioEnabled)
             .putBoolean("haptics_enabled", safeHapticsEnabled)
@@ -274,25 +327,13 @@ class PlaybackViewModel(
 
             val readySong = repository.saveTimeline(workingSong, timeline)
             if (_uiState.value.selectedSong?.uri == readySong.uri) {
-                hapticPlayer.prepare(
-                    uri = uri,
-                    timeline = timeline,
-                    title = readySong.title,
-                    artist = readySong.artist,
-                    patternKey = readySong.patternKey
-                )
+                hapticPlayer.updateTimeline(timeline)
                 _uiState.value = _uiState.value.copy(
                     selectedSong = readySong,
-                    title = readySong.title,
-                    artist = readySong.artist,
-                    duration = timeline.durationMs.takeIf { it > 0 } ?: readySong.duration,
                     previewBars = timeline.previewBars(),
                     isAnalyzing = false,
                     analysisState = SongAnalysisState.READY
                 )
-                if (_uiState.value.isHapticsEnabled && hapticPlayer.exoPlayer.isPlaying) {
-                    hapticPlayer.seekTo(hapticPlayer.exoPlayer.currentPosition)
-                }
             }
             analysisTargetUri = null
         }
@@ -306,11 +347,6 @@ class PlaybackViewModel(
         if (hapticPlayer.isCurrentSong(uri, null)) {
             hapticPlayer.restartCurrent()
             _uiState.value = _uiState.value.copy(
-                selectedSong = song,
-                title = song.title,
-                artist = song.artist,
-                duration = song.duration,
-                currentPosition = 0L,
                 previewBars = emptyList(),
                 isAnalyzing = false,
                 analysisState = song.analysisState
@@ -324,14 +360,11 @@ class PlaybackViewModel(
             timeline = null,
             title = song.title,
             artist = song.artist,
-            patternKey = null
+            patternKey = null,
+            albumArtUri = song.albumArtUri,
+            song = song
         )
         _uiState.value = _uiState.value.copy(
-            selectedSong = song,
-            title = song.title,
-            artist = song.artist,
-            duration = song.duration,
-            currentPosition = 0L,
             previewBars = cachedTimeline?.previewBars().orEmpty(),
             isAnalyzing = false,
             analysisState = song.analysisState
@@ -343,20 +376,11 @@ class PlaybackViewModel(
         val song = _uiState.value.selectedSong ?: return
         viewModelScope.launch {
             val timeline = repository.loadTimeline(song)
-            hapticPlayer.prepare(
-                uri = Uri.parse(song.uri),
-                timeline = timeline,
-                title = song.title,
-                artist = song.artist,
-                patternKey = if (timeline != null && song.analysisState == SongAnalysisState.READY) song.patternKey else null
-            )
+            hapticPlayer.updateTimeline(timeline)
             _uiState.value = _uiState.value.copy(
                 previewBars = timeline?.previewBars().orEmpty(),
                 isAnalyzing = timeline == null && _uiState.value.isAnalyzing
             )
-            if (timeline != null && hapticPlayer.exoPlayer.isPlaying) {
-                hapticPlayer.seekTo(hapticPlayer.exoPlayer.currentPosition)
-            }
         }
     }
 
@@ -380,12 +404,27 @@ class PlaybackViewModel(
             while (isActive) {
                 val hasSong = _uiState.value.selectedSong != null
                 if (hasSong) {
+                    val pos = hapticPlayer.exoPlayer.currentPosition
+                    val duration = if (hapticPlayer.exoPlayer.duration > 0) {
+                        hapticPlayer.exoPlayer.duration
+                    } else {
+                        _uiState.value.duration
+                    }
+                    val amplitude = if (hapticPlayer.isVibrationEnabled) {
+                        hapticPlayer.currentTimeline?.amplitudeAt(pos) ?: 0
+                    } else {
+                        0
+                    }
                     _uiState.value = _uiState.value.copy(
-                        currentPosition = hapticPlayer.exoPlayer.currentPosition,
-                        isPlaying = hapticPlayer.exoPlayer.isPlaying
+                        currentPosition = pos,
+                        duration = duration,
+                        isPlaying = hapticPlayer.exoPlayer.isPlaying,
+                        hasNext = hapticPlayer.hasNext(),
+                        hasPrevious = hapticPlayer.hasPrevious(),
+                        currentHapticAmplitude = amplitude
                     )
                 }
-                delay(100)
+                delay(50)
             }
         }
     }
@@ -393,7 +432,7 @@ class PlaybackViewModel(
     override fun onCleared() {
         super.onCleared()
         analysisJob?.cancel()
-        hapticPlayer.release()
+        // DO NOT release hapticPlayer here; it is application-scoped and must keep playing in background!
     }
 }
 
